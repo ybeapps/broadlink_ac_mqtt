@@ -172,7 +172,7 @@ class AcToMqtt:
 				
 			device_array = { 
 				"name": str(name.decode("utf-8"))
-				#,"power_command_topic" : self.config["mqtt_topic_prefix"]+  device.status["macaddress"]+"/power/set"
+				,"power_command_topic" : self.config["mqtt_topic_prefix"]+  device.status["macaddress"]+"/power/set"
 				,"mode_command_topic" : self.config["mqtt_topic_prefix"]+  device.status["macaddress"]+"/mode_homeassistant/set"
 				,"temperature_command_topic" : self.config["mqtt_topic_prefix"]  + device.status["macaddress"]+"/temp/set"
 				,"fan_mode_command_topic" : self.config["mqtt_topic_prefix"] + device.status["macaddress"]+"/fanspeed_homeassistant/set"

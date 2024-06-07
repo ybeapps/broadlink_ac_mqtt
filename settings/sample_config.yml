@@ -10,7 +10,7 @@ mqtt:
     client_id: ac_to_mqtt
     user: koos
     passwd: koos_se_password
-    topic_prefix: /aircon
+    topic_prefix: /aux
     auto_discovery_topic: homeassistant
     auto_discovery_topic_retain: False
     discovery: False
