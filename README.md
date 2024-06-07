@@ -31,7 +31,7 @@ https://t.me/+1Xw9Kwr2P7k2YjY0
   * Tornado X (2019 and up) --> Tested and working
     * Tornado top wifi 12x a.c Tested and reported as working
   * AUX ASW-H09A4/DE-R1DI (Broadlink module) --> Tested and working
-  * Ballu BSUI/IN-12HN8 (with intergated Wi-Fi module and AC Freedom app). --> Tested and working
+  * Ballu BSUI/IN-12HN8 (with integrated Wi-Fi module and AC Freedom app). --> Tested and working
   * In theory any Broadlink devtype == 0x4E2a (20010) using the AC Freedom APP
 
 ## Installation: 
@@ -39,8 +39,8 @@ https://t.me/+1Xw9Kwr2P7k2YjY0
 pip install -r requirements.txt 
 ```
 
-1. copy sample_config.yml to config.yml under /settings folder or the data-dir you speified
-2. Edit config to match your enviroment
+1. copy sample_config.yml to config.yml under /settings folder or the data-dir you specified
+2. Edit config to match your environment
 3. run ./monitor.py (or python monitor.py)
 
 If you lazy and just want to copy and paste your devices, use the -S option and discovered devicesconfig will be printed to screen for copy/paste
@@ -60,7 +60,7 @@ devices:
 **Note:**  
 Some devices (confirmed on AUX  conditioner) return device **name** in chineese, like '奥克斯空调'.  
 Device renaming in 'AC Freedom' app does not affect. You can see empty **name** in '-S' option output or any artifacts.  
-So in case '-S' returns empty value and you plan to use HASS autodiscovery - the best way to configure yout device manually in config.yml and set 'self_discovery: False'.
+So in case '-S' returns empty value and you plan to use HASS autodiscovery - the best way to configure your device manually in config.yml and set 'self_discovery: False'.
 
 command line arguments: 
 

@@ -7,5 +7,6 @@ desktop.ini
 
 
 .vscode/*
+.idea/
 env/*
 .devcontainer/*
