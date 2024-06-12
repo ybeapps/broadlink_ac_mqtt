@@ -1,3 +1,8 @@
+Run with this command:
+```
+sudo docker run --network="host" -v ./settings:/config --name ac2mqtt 'ac2mqtt'
+```
+
 # ALERT:!!!   Archived
 
 There are simply to many new aircons that don't work with this code anymore, and enough other forks to keep older AC's going

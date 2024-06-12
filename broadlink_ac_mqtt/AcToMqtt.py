@@ -64,10 +64,12 @@ class AcToMqtt:
             sys.exit()
 
         for device in device_list:
-            device_objects[device['mac']] = broadlink.gendevice(devtype=0x4E2a, host=(device['ip'], device['port']),
-                                                                mac=bytearray.fromhex(device['mac']),
-                                                                name=device['name'],
-                                                                update_interval=self.config['update_interval'])
+            new_device = broadlink.gendevice(devtype=0x4E2a, host=(device['ip'], device['port']),
+                                             mac=bytearray.fromhex(device['mac']),
+                                             name=device['name'],
+                                             update_interval=self.config['update_interval'])
+            if new_device:
+                device_objects[device['mac']] = new_device
 
         return device_objects
 
