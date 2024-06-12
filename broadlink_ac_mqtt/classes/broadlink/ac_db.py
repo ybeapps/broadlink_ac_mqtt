@@ -367,9 +367,10 @@ class ac_db(device):
         ##Populate array with latest data
         self.logger.debug("Authenticating")
         if self.auth() == False:
-            self.logger.critical("Authentication Failed to AC")
-            return False
+            self.logger.critical(f"Authentication Failed to AC: {name} ({host}). skipping")
+            return None
 
+        self.logger.info(f"Authenticated to AC: {name} ({host}).")
         self.logger.debug("Getting current details in init")
 
         ##Get the current details
