@@ -12,6 +12,7 @@ import yaml
 import broadlink_ac_mqtt.AcToMqtt as AcToMqtt
 import broadlink_ac_mqtt.classes.broadlink.ac_db as ac_db_version
 
+# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 AC = None
 softwareversion = "1.2.1"
@@ -182,7 +183,8 @@ def init_signal():
     #	signal.signal(signal.SIGUSR2, receiveSignal)
     # signal.signal(signal.SIGPIPE, receiveSignal)
     # signal.signal(signal.SIGALRM, receiveSignal)
-    signal.signal(signal.SIGTERM, stop)
+    # signal.signal(signal.SIGTERM, stop)
+    pass
 
 
 #################  Main startup ####################
