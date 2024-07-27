@@ -9,8 +9,11 @@ import traceback
 import paho.mqtt.client as mqtt
 import yaml
 
-sys.path.insert(1, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'classes', 'broadlink'))
-import broadlink_ac_mqtt.classes.broadlink.ac_db as broadlink
+import broadlink_ac_mqtt.ac_communication.broadlink.device_factory
+import broadlink_ac_mqtt.ac_communication.broadlink.discovery
+import broadlink_ac_mqtt.ac_communication.broadlink.version
+
+sys.path.insert(1, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ac_communication', 'broadlink'))
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +32,12 @@ class AcToMqtt:
     def test(self, config):
 
         for device in config['devices']:
-            device_bla = broadlink.gendevice(devtype=0xFFFFFFF, host=(device['ip'], device['port']),
-                                             mac=bytearray.fromhex(device['mac']), name=device['name'])
+            device_bla = broadlink_ac_mqtt.ac_communication.broadlink.device_factory.gendevice(devtype=0xFFFFFFF,
+                                                                                               host=(device['ip'],
+                                                                                                     device['port']),
+                                                                                               mac=bytearray.fromhex(
+                                                                                                   device['mac']),
+                                                                                               name=device['name'])
             status = device_bla.set_temperature(32)
 
     # print status
@@ -38,7 +45,9 @@ class AcToMqtt:
     def discover(self):
 
         # Go discovery
-        discovered_devices = broadlink.discover(timeout=5, bind_to_ip=self.config['bind_to_ip'])
+        discovered_devices = broadlink_ac_mqtt.ac_communication.broadlink.discovery.discover(timeout=5,
+                                                                                             bind_to_ip=self.config[
+                                                                                                 'bind_to_ip'])
         devices = {}
 
         if discovered_devices == None:
@@ -64,17 +73,20 @@ class AcToMqtt:
             sys.exit()
 
         for device in device_list:
-            new_device = broadlink.gendevice(devtype=0x4E2a, host=(device['ip'], device['port']),
-                                             mac=bytearray.fromhex(device['mac']),
-                                             name=device['name'],
-                                             update_interval=self.config['update_interval'])
+            new_device = broadlink_ac_mqtt.ac_communication.broadlink.device_factory.gendevice(devtype=0x4E2a, host=(
+                device['ip'], device['port']),
+                                                                                               mac=bytearray.fromhex(
+                                                                                                   device['mac']),
+                                                                                               name=device['name'],
+                                                                                               update_interval=
+                                                                                               self.config[
+                                                                                                   'update_interval'])
             if new_device:
                 device_objects[device['mac']] = new_device
 
         return device_objects
 
     def stop(self):
-
         try:
             self._mqtt.disconnect()
         except:
@@ -194,10 +206,10 @@ class AcToMqtt:
                 , "max_temp": 32.0
                 , "min_temp": 16.0
                 , "precision": 0.5
-                , "temp_step": 0.5  #  @Anonym-tsk
+                , "temp_step": 0.5  # @Anonym-tsk
                 , "unique_id": device.status["macaddress"]
                 , "device": {"ids": device.status["macaddress"], "name": str(name.decode("utf-8")), "model": 'Aircon',
-                             "mf": "Broadlink", "sw": broadlink.version}
+                             "mf": "Broadlink", "sw": broadlink_ac_mqtt.ac_communication.broadlink.version.version}
                 , "pl_avail": "online"
                 , "pl_not_avail": "offline"
                 , "availability_topic": self.config["mqtt_topic_prefix"] + "LWT"
