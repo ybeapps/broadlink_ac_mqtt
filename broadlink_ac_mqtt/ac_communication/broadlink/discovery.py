@@ -2,7 +2,7 @@ import socket
 import time
 from datetime import datetime
 
-from broadlink_ac_mqtt.ac_communication.broadlink.device_factory import gendevice
+from broadlink_ac_mqtt.ac_communication.broadlink.device_factory import create_device
 
 
 def discover(timeout=None, bind_to_ip=None):
@@ -75,7 +75,7 @@ def discover(timeout=None, bind_to_ip=None):
             name = mac
         cloud = bool(responsepacket[-1])
         cs.close()
-        return gendevice(devtype, host, mac, name=name, cloud=cloud)
+        return create_device(devtype, host, mac, name=name, cloud=cloud)
     else:
         while (time.time() - starttime) < timeout:
             cs.settimeout(timeout - (time.time() - starttime))
@@ -98,7 +98,7 @@ def discover(timeout=None, bind_to_ip=None):
                 name = mac
 
             cloud = bool(responsepacket[-1])
-            dev = gendevice(devtype, host, mac, name=name, cloud=cloud)
+            dev = create_device(devtype, host, mac, name=name, cloud=cloud)
             devices.append(dev)
 
     cs.close()

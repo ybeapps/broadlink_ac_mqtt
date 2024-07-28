@@ -125,8 +125,8 @@ def touch_pid_file():
         return
 
     pid_last_update = time.time()
-    with open(pidfile, 'w') as f:
-        f.write("%s,%s" % (os.getpid(), pid_last_update))
+    with open(pidfile, 'w', encoding='UTF8') as f:
+        f.write(f"{os.getpid()},{pid_last_update}")
 
 
 def check_if_running():
@@ -166,7 +166,7 @@ def receive_signal(signal_number, frame):
 
 
 def stop(signal_number=0, frame=0):
-    logger.info("Stopping")
+    logger.info(f"Stopping due to signal {signal_number}")
     global do_loop
     do_loop = False
     while running:
@@ -174,7 +174,7 @@ def stop(signal_number=0, frame=0):
         time.sleep(1)
 
     if AC is not None:
-        AC.stop()
+        AC.disconnect_mqtt()
     # clean pid file
     if os.path.isfile(pidfile):
         os.unlink(pidfile)
@@ -251,7 +251,7 @@ def start():
         if os.path.exists(args.data_dir):
             data_dir = args.data_dir
         else:
-            print("Path Not found for Datadir: %s" % args.data_dir)
+            print(f"Path Not found for Datadir: {args.data_dir}")
             sys.exit()
     else:
         data_dir = os.path.dirname(os.path.realpath(__file__))
@@ -261,7 +261,7 @@ def start():
         if os.path.exists(args.config):
             config_file_path = args.config
         else:
-            print("Config file not found: %s" % args.config)
+            print(f"Config file not found: {args.config}")
             sys.exit()
 
     else:
@@ -282,9 +282,9 @@ def start():
     log_level = logging.DEBUG if args.debug else logging.INFO
     init_logging(log_level, log_file_path)
 
-    logger.debug("%s v%s is starting up" % (__file__, softwareversion))
+    logger.debug(f"{__file__} v{softwareversion} is starting up")
     log_level_dict = {0: 'NOTSET', 10: 'DEBUG', 20: 'INFO', 30: 'WARNING', 40: 'ERROR'}
-    logger.info('Loglevel set to ' + log_level_dict[logging.getLogger().getEffectiveLevel()])
+    logger.info(f'Loglevel set to {log_level_dict[logging.getLogger().getEffectiveLevel()]}')
 
     # Apply the config, then if arguments, override the config values with args
     config = read_config(config_file_path)
@@ -357,15 +357,22 @@ def start():
         # One loop
         do_loop = True if config["daemon_mode"] else False
 
+        iteration = 0
         # Run main loop
         while do_loop:
             running = True
 
-            AC.start(config, devices)
+            try:
+                AC.publish_devices_status(config, devices, reconnect_if_needed=iteration % 10 == 0)
 
-            touch_pid_file()
+                touch_pid_file()
 
-        running = False
+            except Exception as e:
+                logger.debug(traceback.format_exc())
+                logger.error(e)
+
+            iteration += 1
+
     except KeyboardInterrupt:
         logging.debug("User Keyboard interrupted")
 
@@ -375,6 +382,7 @@ def start():
         logger.error(e)
 
     finally:
+        running = False
         # cleanup
         stop()
 

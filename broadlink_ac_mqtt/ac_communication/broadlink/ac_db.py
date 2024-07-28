@@ -53,21 +53,14 @@ class ac_db(device):
             OFF = 0
             ON = 1
 
-    def get_ac_status(self, force_update=False):
-
-        ##Get AC info(also populates the current temp)
-        self.logger.debug("Getting AC Info")
-        status = self.get_ac_info()
-        self.logger.debug("AC Info Retrieved")
-
-        return status
-
     def __init__(self, host, mac, name=None, cloud=None, debug=False, update_interval=0, devtype=None, bind_to_ip=None):
 
-        device.__init__(self, host, mac, name=name, cloud=cloud, devtype=devtype, update_interval=update_interval)
+        device.__init__(self, host, mac, name=name, cloud=cloud, devtype=devtype, update_interval=update_interval,
+                        bind_to_ip=bind_to_ip)
 
         devtype = devtype
         self.status = {}
+        self.original_config = None
         self.logger = self.logging.getLogger(__name__)
 
         self.update_interval = update_interval
@@ -97,18 +90,17 @@ class ac_db(device):
         self.get_ac_status(force_update=True)
 
     def get_ac_status(self, force_update=False):
-
-        ##Check if the status is up to date to reduce timeout issues. Can be overwritten by force_update
-        self.logger.debug("Last update was: %s" % self.status['lastupdate'])
+        # Check if the status is up-to-date to reduce timeout issues. Can be overwritten by force_update
+        self.logger.debug(f"Last update was: {self.status['lastupdate']}")
 
         if (force_update == False and (self.status['lastupdate'] + self.update_interval) > time.time()):
             return self.make_nice_status(self.status)
 
-        ##Get AC info(also populates the current temp)
+        # Get AC info(also populates the current temp)
         self.logger.debug("Getting AC Info")
         self.get_ac_info()
         self.logger.debug("AC Info Retrieved")
-        ##Get the current status ... get_ac_states does make_nice_status in return.
+        # Get the current status ... get_ac_states does make_nice_status in return.
         self.logger.debug("Getting AC States")
         status = self.get_ac_states(True)
         self.logger.debug("AC States retrieved")
@@ -137,7 +129,7 @@ class ac_db(device):
         self.status['devicename'] = None
 
     def set_temperature(self, temperature):
-        self.logger.debug("Setting temprature to %s", temperature)
+        self.logger.debug("Setting temperature to %s", temperature)
         self.get_ac_states()
         self.status['temp'] = float(temperature)
 
@@ -391,7 +383,7 @@ class ac_db(device):
     def get_ac_info(self):
         GET_AC_INFO = bytearray.fromhex("0C00BB0006800000020021011B7E0000")
         response = self.send_packet(0x6a, GET_AC_INFO)
-        # print "Resposnse:" + ''.join(format(x, '02x') for x in response)
+        # print "Response:" + ''.join(format(x, '02x') for x in response)
         # print "Response:" + ' '.join(format(x, '08b') for x in response[9:])
 
         err = response[0x22] | (response[0x23] << 8)
@@ -434,8 +426,8 @@ class ac_db(device):
         GET_STATES = bytearray.fromhex(
             "0C00BB0006800000020011012B7E0000")  ##From app queryAuxinfo:bb0006800000020011012b7e
 
-        ##Check if the status is up to date to reduce timeout issues. Can be overwritten by force_update
-        self.logger.debug("Last update was: %s" % self.status['lastupdate'])
+        # Check if the status is up to date to reduce timeout issues. Can be overwritten by force_update
+        self.logger.debug(f"Last update was: {self.status['lastupdate']}")
         if (force_update == False and (self.status['lastupdate'] + self.update_interval) > time.time()):
             return self.make_nice_status(self.status)
 

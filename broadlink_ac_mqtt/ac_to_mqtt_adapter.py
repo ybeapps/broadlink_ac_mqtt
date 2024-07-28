@@ -9,16 +9,14 @@ import traceback
 import paho.mqtt.client as mqtt
 import yaml
 
-import broadlink_ac_mqtt.ac_communication.broadlink.device_factory
 import broadlink_ac_mqtt.ac_communication.broadlink.discovery
 import broadlink_ac_mqtt.ac_communication.broadlink.version
+from broadlink_ac_mqtt.ac_communication.broadlink import device_factory
+from broadlink_ac_mqtt.ac_communication.broadlink.ac_db_disconnected import ac_db_disconnected
 
 sys.path.insert(1, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ac_communication', 'broadlink'))
 
 logger = logging.getLogger(__name__)
-
-config = {}
-device_objects = {}
 
 
 class AcToMqtt:
@@ -26,18 +24,17 @@ class AcToMqtt:
     last_update = {}
 
     def __init__(self, config):
+        self.device_objects = None
         self.config = config
-        ""
+        self._mqtt: mqtt.Client = None
 
     def test(self, config):
 
         for device in config['devices']:
-            device_bla = broadlink_ac_mqtt.ac_communication.broadlink.device_factory.gendevice(devtype=0xFFFFFFF,
-                                                                                               host=(device['ip'],
-                                                                                                     device['port']),
-                                                                                               mac=bytearray.fromhex(
-                                                                                                   device['mac']),
-                                                                                               name=device['name'])
+            device_bla = device_factory.create_device(dev_type=0xFFFFFFF,
+                                                      host=(device['ip'], device['port']),
+                                                      mac=bytearray.fromhex(device['mac']),
+                                                      name=device['name'])
             status = device_bla.set_temperature(32)
 
     # print status
@@ -73,27 +70,36 @@ class AcToMqtt:
             sys.exit()
 
         for device in device_list:
-            new_device = broadlink_ac_mqtt.ac_communication.broadlink.device_factory.gendevice(devtype=0x4E2a, host=(
-                device['ip'], device['port']),
-                                                                                               mac=bytearray.fromhex(
-                                                                                                   device['mac']),
-                                                                                               name=device['name'],
-                                                                                               update_interval=
-                                                                                               self.config[
-                                                                                                   'update_interval'])
-            if new_device:
-                device_objects[device['mac']] = new_device
+            new_device = self.device_config_to_device_object(device)
+            device_objects[device['mac']] = new_device
 
         return device_objects
 
-    def stop(self):
+    def device_config_to_device_object(self, device_config):
+        new_device = device_factory.create_device(dev_type=0x4E2a,
+                                                  host=(device_config['ip'], device_config['port']),
+                                                  mac=bytearray.fromhex(device_config['mac']),
+                                                  name=device_config['name'],
+                                                  update_interval=self.config['update_interval'])
+
+        if not new_device:
+            new_device = device_factory.create_device(dev_type=0xFFFFFFFF,
+                                                      host=(device_config['ip'], device_config['port']),
+                                                      mac=bytearray.fromhex(device_config['mac']),
+                                                      name=device_config['name'],
+                                                      update_interval=self.config['update_interval'])
+
+        new_device.original_config = device_config
+
+        return new_device
+
+    def disconnect_mqtt(self):
         try:
             self._mqtt.disconnect()
         except:
             ""
 
-    def start(self, config, devices=None):
-
+    def publish_devices_status(self, config, devices, reconnect_if_needed: bool):
         self.device_objects = devices
         self.config = config
 
@@ -103,7 +109,7 @@ class AcToMqtt:
             logger.error("No Devices defined, either enable discovery or add them to config")
             return
         else:
-            logger.debug("Following devices configured %s" % repr(devices))
+            logger.debug(f"Following devices configured {repr(devices)}")
 
         # we are alive # Update PID file
         try:
@@ -113,20 +119,32 @@ class AcToMqtt:
                 device = devices[key]
                 # Just check status on every update interval
                 if key in self.last_update:
-                    logger.debug("Checking %s for timeout" % key)
+                    logger.debug(f"Checking {key} for timeout")
                     if (self.last_update[key] + self.config["update_interval"]) > time.time():
-                        logger.debug("Timeout %s not done, so lets wait a abit : %s : %s" % (
-                            self.config["update_interval"], self.last_update[key] + self.config["update_interval"],
-                            time.time()))
+                        logger.debug(
+                            f"Timeout {self.config['update_interval']} not done, so lets wait a abit : "
+                            f"{self.last_update[key] + self.config['update_interval']} : {time.time()}")
                         time.sleep(0.5)
                         continue
                     else:
                         ""
                 # print "timeout done"
 
+                if reconnect_if_needed:
+                    if isinstance(device, ac_db_disconnected):
+                        logger.info(f"Device {key} is disconnected, trying to reconnect")
+                        device = self.device_config_to_device_object(device.original_config)
+                        devices[key] = device
+
                 # Get the status, the global update interval is used as well to reduce requests to aircons as they slow
 
-                status = device.get_ac_status()
+                try:
+                    status = device.get_ac_status()
+                except Exception as e:
+                    logger.warning(f"Device {key} - failed to retrieve status. considering as disconnected")
+                    device = self.device_config_to_device_object(device.original_config)
+                    devices[key] = device
+                    status = None
 
                 # print status
                 if status:
@@ -277,7 +295,7 @@ class AcToMqtt:
                                       value)
 
             if pubResult != None:
-                logger.warning('Publishing Result: "%s"' % mqtt.error_string(pubResult))
+                logger.warning(f'Publishing Result: "{mqtt.error_string(pubResult)}"')
                 if pubResult == mqtt.MQTT_ERR_NO_CONN:
                     self.connect_mqtt()
 
@@ -292,16 +310,15 @@ class AcToMqtt:
 
     def _publish(self, topic, value, retain=False, qos=0):
         payload = value
-        logger.debug('publishing on topic "%s", data "%s"' % (topic, payload))
+        logger.debug(f'publishing on topic "{topic}", data "{payload}"')
         pubResult = self._mqtt.publish(topic, payload=payload, qos=qos, retain=retain)
 
         # If there is an error, then debug log and return not None
         if pubResult[0] != 0:
-            logger.debug('Publishing Result: "%s"' % mqtt.error_string(pubResult[0]))
+            logger.debug(f'Publishing Result: "{mqtt.error_string(pubResult[0])}"')
             return pubResult[0]
 
     def connect_mqtt(self):
-
         # Setup client
         self._mqtt = mqtt.Client(client_id=self.config["mqtt_client_id"], clean_session=True, userdata=None)
 
@@ -320,7 +337,7 @@ class AcToMqtt:
 
         # Connect
         logger.debug(
-            "Connecting to MQTT: %s with client ID = %s" % (self.config["mqtt_host"], self.config["mqtt_client_id"]))
+            f"Connecting to MQTT: {self.config['mqtt_host']} with client ID = {self.config['mqtt_client_id']}")
         self._mqtt.connect(self.config["mqtt_host"], port=self.config["mqtt_port"], keepalive=60, bind_address="")
 
         # Start
@@ -329,7 +346,7 @@ class AcToMqtt:
     def _on_mqtt_log(self, client, userdata, level, buf):
 
         if level == mqtt.MQTT_LOG_ERR:
-            logger.debug("Mqtt log: " + buf)
+            logger.debug(f"Mqtt log: {buf}")
 
     def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
         logger.debug("Mqtt Subscribed")
@@ -338,7 +355,7 @@ class AcToMqtt:
 
         try:
             logger.debug(
-                'Mqtt Message Received! Userdata: %s, Message %s' % (userdata, msg.topic + " " + str(msg.payload)))
+                f'Mqtt Message Received! Userdata: {userdata}, Message {msg.topic + " " + str(msg.payload)}')
             # Function is second last .. decode to str #43
             function = str(msg.topic.split('/')[-2])
             address = msg.topic.split('/')[-3]
@@ -346,13 +363,15 @@ class AcToMqtt:
             address = address.encode('ascii', 'ignore').decode("utf-8")
             # 43 decode to force to str
             value = str(msg.payload.decode("ascii"))
-            logger.debug('Mqtt decoded --> Function: %s, Address: %s, value: %s' % (function, address, value))
+            logger.debug(f'Mqtt decoded --> Function: {function}, Address: {address}, value: {value}')
 
         except Exception as e:
             logger.critical(e)
             return
 
-        # Process received		# Probably need to exit here as well if command not send, but should exit on status update above .. grr, hate stupid python
+        # Process received
+        # Probably need to exit here as well if command not send, but should exit on status update
+        # above .. grr, hate stupid python
         if function == "temp":
             try:
                 if self.device_objects.get(address):
@@ -361,7 +380,7 @@ class AcToMqtt:
                     if status:
                         self.publish_mqtt_info(status)
                 else:
-                    logger.debug("Device not on list of devices %s, type:%s" % (address, type(address)))
+                    logger.debug(f"Device not on list of devices {address}, type: {type(address)}")
                     return
             except Exception as e:
                 logger.critical(e)
@@ -454,7 +473,7 @@ class AcToMqtt:
                 logger.debug("Refreshing states")
                 status = self.device_objects[address].get_ac_status()
             else:
-                logger.debug("Command not valid: " + value)
+                logger.debug(f"Command not valid: {value}")
                 return
 
             if status:
@@ -471,7 +490,7 @@ class AcToMqtt:
                     if status:
                         self.publish_mqtt_info(status)
                 else:
-                    logger.debug("Device not on list of devices %s, type:%s" % (address, type(address)))
+                    logger.debug(f"Device not on list of devices {address}, type: {type(address)}")
                     return
             except Exception as e:
                 logger.critical(e)
@@ -483,7 +502,7 @@ class AcToMqtt:
                     if status:
                         self.publish_mqtt_info(status)
                 else:
-                    logger.debug("Device not on list of devices %s, type:%s" % (address, type(address)))
+                    logger.debug(f"Device not on list of devices {address}, type: {type(address)}")
                     return
             except Exception as e:
                 logger.critical(e)
@@ -495,7 +514,7 @@ class AcToMqtt:
                     if status:
                         self.publish_mqtt_info(status)
                 else:
-                    logger.debug("Device not on list of devices %s, type:%s" % (address, type(address)))
+                    logger.debug(f"Device not on list of devices {address}, type: {type(address)}")
                     return
             except Exception as e:
                 logger.critical(e)
@@ -507,7 +526,7 @@ class AcToMqtt:
                     if status:
                         self.publish_mqtt_info(status)
                 else:
-                    logger.debug("Device not on list of devices %s, type:%s" % (address, type(address)))
+                    logger.debug(f"Device not on list of devices {address}, type: {type(address)}")
                     return
             except Exception as e:
                 logger.critical(e)
@@ -519,7 +538,7 @@ class AcToMqtt:
                     if status:
                         self.publish_mqtt_info(status)
                 else:
-                    logger.debug("Device not on list of devices %s, type:%s" % (address, type(address)))
+                    logger.debug(f"Device not on list of devices {address}, type: {type(address)}")
                     return
             except Exception as e:
                 logger.critical(e)
@@ -531,7 +550,7 @@ class AcToMqtt:
                     if status:
                         self.publish_mqtt_info(status)
                 else:
-                    logger.debug("Device not on list of devices %s, type:%s" % (address, type(address)))
+                    logger.debug(f"Device not on list of devices {address}, type: {type(address)}")
                     return
             except Exception as e:
                 logger.critical(e)
@@ -543,7 +562,7 @@ class AcToMqtt:
                     if status:
                         self.publish_mqtt_info(status)
                 else:
-                    logger.debug("Device not on list of devices %s, type:%s" % (address, type(address)))
+                    logger.debug(f"Device not on list of devices {address}, type: {type(address)}")
                     return
             except Exception as e:
                 logger.critical(e)
@@ -553,7 +572,6 @@ class AcToMqtt:
             return
 
     def _on_mqtt_connect(self, client, userdata, flags, rc):
-
         """
         RC definition:
         0: Connection successful
@@ -565,12 +583,12 @@ class AcToMqtt:
         6-255: Currently unused.
         """
 
-        logger.debug('Mqtt connected! client=%s, userdata=%s, flags=%s, rc=%s' % (client, userdata, flags, rc))
+        logger.debug(f'Mqtt connected! client={client}, userdata={userdata}, flags={flags}, rc={rc}')
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
         sub_topic = self.config["mqtt_topic_prefix"] + "+/+/set"
         client.subscribe(sub_topic)
-        logger.debug('Listing on %s for messages' % sub_topic)
+        logger.debug(f'Listing on {sub_topic} for messages')
 
         # LWT
         self._publish(self.config["mqtt_topic_prefix"] + 'LWT', 'online', retain=True)
