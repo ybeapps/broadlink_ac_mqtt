@@ -598,7 +598,7 @@ class AcToMqtt:
             if self.device_objects:
                 for device_key, device in self.device_objects.items():
                     try:
-                        if not device.status:
+                        if not hasattr(device, 'status') or not device.status:
                             logger.info(f"Reconnecting to device {device_key}")
                             self.device_objects[device_key] = self.device_config_to_device_object(device.original_config)
                     except Exception as e:

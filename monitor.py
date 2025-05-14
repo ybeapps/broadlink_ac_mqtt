@@ -380,7 +380,7 @@ def start():
             try:
                 if iteration % 3 == 0:
                     for key, device in devices.items():
-                        if not device.status:
+                        if not hasattr(device, 'status') or not device.status:
                             logger.info(f"Device {key} is disconnected, attempting reconnection.")
                             new_device = AC.device_config_to_device_object(device.original_config)
                             if validate_device_reconnection(new_device):
