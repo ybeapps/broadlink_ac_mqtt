@@ -11,7 +11,7 @@ import yaml
 from broadlink_ac_mqtt.ac_communication.broadlink.version import version as broadlink_version
 from broadlink_ac_mqtt.ac_to_mqtt_adapter import AcToMqtt
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 AC: AcToMqtt
 softwareversion = "1.2.1"
