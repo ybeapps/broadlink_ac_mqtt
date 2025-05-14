@@ -9,6 +9,26 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from broadlink_ac_mqtt.ac_communication.broadlink.connect_timeout import ConnectTimeout
 
 
+def retry_on_failure(retries=3, delay=1, backoff=2):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            attempt = 0
+            current_delay = delay
+            while attempt < retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    print(f"ERROR in retry decorator: {type(e).__name__}: {e}")
+                    attempt += 1
+                    if attempt >= retries:
+                        raise
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+            return None # unreachable
+        return wrapper
+    return decorator
+
+
 class device:
     __INIT_KEY = "097628343fe99e23765c1513accf8b02"
     __INIT_VECT = "562e17996d093d28ddb3ba695a2e6f58"
@@ -106,6 +126,7 @@ class device:
     def get_type(self):
         return self.type
 
+    @retry_on_failure(retries=3, delay=1, backoff=2)
     def send_packet(self, command, payload):
         self.count = (self.count + 1) & 0xffff
         packet = bytearray(0x38)

@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import traceback
+import threading
 
 import paho.mqtt.client as mqtt
 import yaml
@@ -12,7 +13,6 @@ import yaml
 import broadlink_ac_mqtt.ac_communication.broadlink.discovery
 import broadlink_ac_mqtt.ac_communication.broadlink.version
 from broadlink_ac_mqtt.ac_communication.broadlink import device_factory
-from broadlink_ac_mqtt.ac_communication.broadlink.ac_db_disconnected import ac_db_disconnected
 
 sys.path.insert(1, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ac_communication', 'broadlink'))
 
@@ -27,6 +27,7 @@ class AcToMqtt:
         self.device_objects = None
         self.config = config
         self._mqtt: mqtt.Client = None
+        self.start_monitoring()
 
     def test(self, config):
 
@@ -103,7 +104,7 @@ class AcToMqtt:
         except:
             ""
 
-    def publish_devices_status(self, config, devices, reconnect_if_needed: bool):
+    def publish_devices_status(self, config, devices):
         self.device_objects = devices
         self.config = config
 
@@ -133,12 +134,6 @@ class AcToMqtt:
                     else:
                         ""
                 # print "timeout done"
-
-                if reconnect_if_needed:
-                    if isinstance(device, ac_db_disconnected):
-                        logger.info(f"Device {key} is disconnected, trying to reconnect")
-                        device = self.device_config_to_device_object(device.original_config)
-                        devices[key] = device
 
                 # Get the status, the global update interval is used as well to reduce requests to aircons as they slow
 
@@ -597,3 +592,19 @@ class AcToMqtt:
 
         # LWT
         self._publish(self.config["mqtt_topic_prefix"] + 'LWT', 'online', retain=True)
+
+    def monitor_connections(self):
+        while True:
+            if self.device_objects:
+                for device_key, device in self.device_objects.items():
+                    try:
+                        if not device.status:
+                            logger.info(f"Reconnecting to device {device_key}")
+                            self.device_objects[device_key] = self.device_config_to_device_object(device.original_config)
+                    except Exception as e:
+                        logger.error(f"Failed to reconnect to device {device_key}: {e}")
+            time.sleep(self.config.get('update_interval', 10))
+
+    def start_monitoring(self):
+        monitor_thread = threading.Thread(target=self.monitor_connections, daemon=True)
+        monitor_thread.start()

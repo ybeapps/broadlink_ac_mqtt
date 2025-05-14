@@ -11,7 +11,7 @@ import yaml
 from broadlink_ac_mqtt.ac_communication.broadlink.version import version as broadlink_version
 from broadlink_ac_mqtt.ac_to_mqtt_adapter import AcToMqtt
 
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 AC: AcToMqtt
 softwareversion = "1.2.1"
@@ -357,14 +357,39 @@ def start():
         # One loop
         do_loop = True if config["daemon_mode"] else False
 
+        def validate_device_reconnection(device):
+            try:
+                # Attempt to authenticate or fetch status to validate reconnection
+                if not device.auth():
+                    logger.warning(f"Device {device.name} failed to authenticate after reconnection.")
+                    return False
+                status = device.get_ac_status()
+                if not status:
+                    logger.warning(f"Device {device.name} failed to fetch status after reconnection.")
+                    return False
+                return True
+            except Exception as e:
+                logger.error(f"Error validating device {device.name} after reconnection: {e}")
+                return False
+
         iteration = 0
         # Run main loop
         while do_loop:
             running = True
 
             try:
-                AC.publish_devices_status(config, devices, reconnect_if_needed=iteration % 3 == 0)
+                if iteration % 3 == 0:
+                    for key, device in devices.items():
+                        if not device.status:
+                            logger.info(f"Device {key} is disconnected, attempting reconnection.")
+                            new_device = AC.device_config_to_device_object(device.original_config)
+                            if validate_device_reconnection(new_device):
+                                devices[key] = new_device
+                                logger.info(f"Device {key} reconnected successfully.")
+                            else:
+                                logger.warning(f"Device {key} reconnection failed.")
 
+                AC.publish_devices_status(config, devices)
                 touch_pid_file()
 
             except Exception as e:
