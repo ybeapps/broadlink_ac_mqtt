@@ -76,11 +76,15 @@ class AcToMqtt:
         return device_objects
 
     def device_config_to_device_object(self, device_config):
-        new_device = device_factory.create_device(dev_type=0x4E2a,
-                                                  host=(device_config['ip'], device_config['port']),
-                                                  mac=bytearray.fromhex(device_config['mac']),
-                                                  name=device_config['name'],
-                                                  update_interval=self.config['update_interval'])
+        try:
+            new_device = device_factory.create_device(dev_type=0x4E2a,
+                                                      host=(device_config['ip'], device_config['port']),
+                                                      mac=bytearray.fromhex(device_config['mac']),
+                                                      name=device_config['name'],
+                                                      update_interval=self.config['update_interval'])
+        except Exception as e:
+            logger.error(f"Failed to create device object from config: {device_config}")
+            new_device = None
 
         if not new_device:
             new_device = device_factory.create_device(dev_type=0xFFFFFFFF,
@@ -122,7 +126,7 @@ class AcToMqtt:
                     logger.debug(f"Checking {key} for timeout")
                     if (self.last_update[key] + self.config["update_interval"]) > time.time():
                         logger.debug(
-                            f"Timeout {self.config['update_interval']} not done, so lets wait a abit : "
+                            f"Timeout {self.config['update_interval']} not done, so lets wait a bit : "
                             f"{self.last_update[key] + self.config['update_interval']} : {time.time()}")
                         time.sleep(0.5)
                         continue
@@ -138,6 +142,7 @@ class AcToMqtt:
 
                 # Get the status, the global update interval is used as well to reduce requests to aircons as they slow
 
+                status = None
                 try:
                     status = device.get_ac_status()
                 except Exception as e:

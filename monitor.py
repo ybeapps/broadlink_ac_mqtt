@@ -363,7 +363,7 @@ def start():
             running = True
 
             try:
-                AC.publish_devices_status(config, devices, reconnect_if_needed=iteration % 10 == 0)
+                AC.publish_devices_status(config, devices, reconnect_if_needed=iteration % 3 == 0)
 
                 touch_pid_file()
 

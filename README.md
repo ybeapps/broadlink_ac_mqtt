@@ -1,6 +1,6 @@
 Run with this command:
 ```
-sudo docker run --network="host" -v ./settings:/config --name ac2mqtt 'ac2mqtt'
+sudo docker run -- --network="host" --restart=always -v ./settings:/config --name ac2mqtt 'ac2mqtt'
 ```
 
 # ALERT:!!!   Archived

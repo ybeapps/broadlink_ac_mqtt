@@ -93,7 +93,7 @@ class ac_db(device):
         # Check if the status is up-to-date to reduce timeout issues. Can be overwritten by force_update
         self.logger.debug(f"Last update was: {self.status['lastupdate']}")
 
-        if (force_update == False and (self.status['lastupdate'] + self.update_interval) > time.time()):
+        if force_update is False and (self.status['lastupdate'] + self.update_interval) > time.time():
             return self.make_nice_status(self.status)
 
         # Get AC info(also populates the current temp)
@@ -408,14 +408,14 @@ class ac_db(device):
             ##Its only the last 5 bits?
             ambient_temp = response_payload[15] & 0b00011111
 
-            self.logger.debug("Ambient Temp Decimal: %s" % float(response_payload[31] & 0b00011111))  ## @Anonym-tsk
+            self.logger.debug(f"Ambient Temp Decimal: {float(response_payload[31] & 0b00011111)}")  ## @Anonym-tsk
 
             if ambient_temp:
                 self.status['ambient_temp'] = ambient_temp
 
             return self.make_nice_status(self.status)
         else:
-            self.logger.debug("Invalid packet received Errorcode %s" % err)
+            self.logger.debug(f"Invalid packet received Errorcode {err}")
             self.logger.debug("Failed Raw Response: " + ' '.join(format(x, '08b') for x in response))
             return 0
 
@@ -428,7 +428,7 @@ class ac_db(device):
 
         # Check if the status is up to date to reduce timeout issues. Can be overwritten by force_update
         self.logger.debug(f"Last update was: {self.status['lastupdate']}")
-        if (force_update == False and (self.status['lastupdate'] + self.update_interval) > time.time()):
+        if force_update == False and (self.status['lastupdate'] + self.update_interval) > time.time():
             return self.make_nice_status(self.status)
 
         response = self.send_packet(0x6a, GET_STATES)
@@ -478,8 +478,6 @@ class ac_db(device):
 
         else:
             return 0
-
-        return self.status
 
     def make_nice_status(self, status):
         status_nice = {}
