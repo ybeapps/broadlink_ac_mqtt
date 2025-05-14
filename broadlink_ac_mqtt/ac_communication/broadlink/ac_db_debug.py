@@ -296,10 +296,11 @@ class ac_db_debug(device):
                     response = self.cs.recvfrom(1024)
                     # print response
                     break
-                except socket.timeout:
+                except socket.timeout as err:
                     if (time.time() - starttime) < self.timeout:
                         pass
                     # print "timedout"
+                    print(err)
                     raise ConnectTimeout(200, self.host)
         return bytearray(response[0])
 

@@ -3,4 +3,5 @@ from broadlink_ac_mqtt.ac_communication.broadlink.connect_error import ConnectEr
 
 class ConnectTimeout(ConnectError):
     """Connection Timeout"""
-    pass
+    def __init__(self, code, host):
+        super().__init__(code, host)

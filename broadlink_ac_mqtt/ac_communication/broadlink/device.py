@@ -184,8 +184,9 @@ class device:
                     response = self.cs.recvfrom(1024)
 
                     break
-                except socket.timeout:
+                except socket.timeout as err:
                     if (time.time() - starttime) < self.timeout:
                         pass
-                    raise ConnectTimeout(200, self.host)
+                    print(err)
+                    raise ConnectTimeout(200, (self.host[0], self.host[1]))
         return bytearray(response[0])
