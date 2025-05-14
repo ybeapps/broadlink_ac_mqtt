@@ -1,6 +1,12 @@
+Install:
+
+copy python code and relevant files to RaspberryPi (FileZilla might be effective)
+
 Run with this command:
 ```
-sudo docker run -- --network="host" --restart=always -v ./settings:/config --name ac2mqtt 'ac2mqtt'
+sudo docker rm -f ac2mqtt
+
+sudo docker run --network="host" --restart=always -v ./settings:/config --name ac2mqtt 'ac2mqtt'
 ```
 
 # ALERT:!!!   Archived
