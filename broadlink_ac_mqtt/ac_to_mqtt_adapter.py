@@ -206,7 +206,8 @@ class AcToMqtt:
                     "macaddress"] + "/fanspeed_homeassistant/set"
                 , "swing_mode_command_topic": self.config["mqtt_topic_prefix"] + device.status[
                     "macaddress"] + "/fixation_v/set"
-                , "action_topic": self.config["mqtt_topic_prefix"] + device.status["macaddress"] + "/homeassistant/set"
+                # action_topic removed: bridge does not publish hvac_action state values
+                # (HA 2025+ requires valid action strings like "heating"/"cooling"/"idle")
                 # Read values
                 , "current_temperature_topic": self.config["mqtt_topic_prefix"] + device.status[
                     "macaddress"] + "/ambient_temp/value"
@@ -319,8 +320,18 @@ class AcToMqtt:
             return pubResult[0]
 
     def connect_mqtt(self):
-        # Setup client
-        self._mqtt = mqtt.Client(client_id=self.config["mqtt_client_id"], clean_session=True, userdata=None)
+        # Setup client – support both paho-mqtt 1.x and 2.x
+        try:
+            # paho-mqtt 2.0+ requires CallbackAPIVersion
+            self._mqtt = mqtt.Client(
+                callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
+                client_id=self.config["mqtt_client_id"],
+                clean_session=True,
+                userdata=None,
+            )
+        except AttributeError:
+            # paho-mqtt 1.x does not have CallbackAPIVersion
+            self._mqtt = mqtt.Client(client_id=self.config["mqtt_client_id"], clean_session=True, userdata=None)
 
         # Set last will and testament
         self._mqtt.will_set(self.config["mqtt_topic_prefix"] + "LWT", "offline", True)
@@ -333,7 +344,7 @@ class AcToMqtt:
         self._mqtt.on_connect = self._on_mqtt_connect
         self._mqtt.on_message = self._on_mqtt_message
         self._mqtt.on_log = self._on_mqtt_log
-        self._mqtt.on_subscribed = self._mqtt_on_subscribe
+        self._mqtt.on_subscribe = self._mqtt_on_subscribe
 
         # Connect
         logger.debug(
@@ -348,7 +359,7 @@ class AcToMqtt:
         if level == mqtt.MQTT_LOG_ERR:
             logger.debug(f"Mqtt log: {buf}")
 
-    def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
+    def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos, *args):
         logger.debug("Mqtt Subscribed")
 
     def _on_mqtt_message(self, client, userdata, msg):

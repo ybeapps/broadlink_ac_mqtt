@@ -484,7 +484,12 @@ class ac_db(device):
         status_nice['temp'] = status['temp']
         status_nice['ambient_temp'] = status['ambient_temp']
         status_nice['power'] = self.get_key(self.STATIC.ONOFF.__dict__, status['power'])
-        status_nice['fixation_v'] = self.get_key(self.STATIC.FIXATION.VERTICAL.__dict__, status['fixation_v'])
+        fixation_v_value = self.get_key(self.STATIC.FIXATION.VERTICAL.__dict__, status['fixation_v'])
+        # If fixation_v is 0 or any other unmapped integer, fall back to AUTO to avoid HA warning
+        # "Invalid swing_modes mode: 0" (HA 2025+)
+        if not isinstance(fixation_v_value, str):
+            fixation_v_value = 'AUTO'
+        status_nice['fixation_v'] = fixation_v_value
         status_nice['mode'] = self.get_key(self.STATIC.MODE.__dict__, status['mode'])
         status_nice['sleep'] = self.get_key(self.STATIC.ONOFF.__dict__, status['sleep'])
         status_nice['display'] = self.get_key(self.STATIC.ONOFF.__dict__, status['display'])
