@@ -89,10 +89,9 @@ class AcToMqtt:
                                                       update_interval=self.config['update_interval'])
         except Exception as e:
             logger.error(f"Failed to create device object from config: {device_config}")
-            new_device = None
-
-        if not new_device:
-            new_device = device_factory.create_device(dev_type=0xFFFFFFFF,
+            # Use disconnected stub — returns None from get_ac_status() without throwing,
+            # so the main loop gracefully skips it until the next reconnect attempt.
+            new_device = device_factory.create_device(dev_type=0x0000000,
                                                       host=(device_config['ip'], device_config['port']),
                                                       mac=bytearray.fromhex(device_config['mac']),
                                                       name=device_config['name'],
