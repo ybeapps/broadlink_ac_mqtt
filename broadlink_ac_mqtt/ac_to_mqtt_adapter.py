@@ -18,6 +18,8 @@ sys.path.insert(1, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ac
 
 logger = logging.getLogger(__name__)
 
+_RECONNECT_COOLDOWN_SECS = 30
+
 
 class AcToMqtt:
     previous_status = {}
@@ -27,6 +29,8 @@ class AcToMqtt:
         self.device_objects = None
         self.config = config
         self._mqtt: mqtt.Client = None
+        self._reconnect_cooldown: dict = {}
+        self._devices_lock = threading.Lock()
         self.start_monitoring()
 
     def test(self, config):
@@ -140,10 +144,15 @@ class AcToMqtt:
                 status = None
                 try:
                     status = device.get_ac_status()
+                    self._reconnect_cooldown.pop(key, None)
                 except Exception as e:
                     logger.warning(f"Device {key} - failed to retrieve status. considering as disconnected")
-                    device = self.device_config_to_device_object(device.original_config)
-                    devices[key] = device
+                    last_attempt = self._reconnect_cooldown.get(key, 0)
+                    if time.time() - last_attempt >= _RECONNECT_COOLDOWN_SECS:
+                        self._reconnect_cooldown[key] = time.time()
+                        new_device = self.device_config_to_device_object(device.original_config)
+                        with self._devices_lock:
+                            devices[key] = new_device
                     status = None
 
                 # print status
@@ -607,11 +616,21 @@ class AcToMqtt:
     def monitor_connections(self):
         while True:
             if self.device_objects:
-                for device_key, device in self.device_objects.items():
+                with self._devices_lock:
+                    items = list(self.device_objects.items())
+                for device_key, device in items:
                     try:
                         if not hasattr(device, 'status') or not device.status:
+                            last_attempt = self._reconnect_cooldown.get(device_key, 0)
+                            if time.time() - last_attempt < _RECONNECT_COOLDOWN_SECS:
+                                continue
                             logger.info(f"Reconnecting to device {device_key}")
-                            self.device_objects[device_key] = self.device_config_to_device_object(device.original_config)
+                            self._reconnect_cooldown[device_key] = time.time()
+                            new_device = self.device_config_to_device_object(device.original_config)
+                            if hasattr(new_device, 'status') and new_device.status:
+                                self._reconnect_cooldown.pop(device_key, None)
+                            with self._devices_lock:
+                                self.device_objects[device_key] = new_device
                     except Exception as e:
                         logger.error(f"Failed to reconnect to device {device_key}: {e}")
             time.sleep(self.config.get('update_interval', 10))
