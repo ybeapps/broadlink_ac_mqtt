@@ -10,7 +10,7 @@ def create_device(dev_type, host, mac, name=None, cloud=None, update_interval=0)
         # We only care about 1 device type...
         case 0x4E2a:  # Danham Bush
             return ac_db(host=host, mac=mac, name=name, cloud=cloud, devtype=dev_type, update_interval=0)
-        case 0xFFFFFFF:  # test
+        case 0xFFFFFFFF:  # test
             return ac_db_debug(host=host, mac=mac, name=name, cloud=cloud, devtype=dev_type, update_interval=0)
         case 0x0000000:
             return ac_db_disconnected(dev_type=dev_type)
